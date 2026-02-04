@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chat App</title>
+  <style>
+    body { margin: 0; font-family: Arial; display: flex; height: 100vh; }
+    .users-list { width: 200px; background: #f5f5f5; border-right: 1px solid #ddd; overflow-y: auto; }
+    .users-list li { padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; }
+    .users-list li.active { background: #ddd; font-weight: bold; }
+
+    .chat-container { flex: 1; display: flex; flex-direction: column; }
+    #messages { flex: 1; padding: 10px; list-style: none; overflow-y: auto; }
+    #messages li { max-width: 70%; margin-bottom: 10px; padding: 8px 12px; border-radius: 20px; }
+    .me { background: #dcf8c6; align-self: flex-end; }
+    .other { background: #eee; align-self: flex-start; }
+
+    #input-container { display: flex; padding: 10px; border-top: 1px solid #ddd; }
+    #input { flex: 1; padding: 10px; border-radius: 20px; border: 1px solid #ccc; }
+    #sendBtn { margin-left: 10px; padding: 10px 20px; border: none; border-radius: 20px; background: #0084ff; color: white; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <ul class="users-list" id="usersList"></ul>
+  <div class="chat-container">
+    <ul id="messages"></ul>
+    <div id="input-container">
+      <input id="input" placeholder="Type a message..." autocomplete="off" />
+      <button id="sendBtn">Send</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    // Get userId from URL
+    const params = new URLSearchParams(window.location.search);
+    const userId = params.get("user");
+
+    // Join own room
+    socket.emit("join", userId);
+
+    const messagesEl = document.getElementById("messages");
+    const inputEl = document.getElementById("input");
+    const sendBtn = document.getElementById("sendBtn");
+    const usersListEl = document.getElementById("usersList");
+
+    let selectedUser = null;
+    let users = [];
+
+    // Fetch users from server
+    fetch("/users")
+      .then(res => res.json())
+      .then(data => {
+        users = data.filter(u => u.id != userId); // exclude self
+        renderUsers();
+      });
+
+    function renderUsers() {
+      usersListEl.innerHTML = "";
+      users.forEach(u => {
+        const li = document.createElement("li");
+        li.textContent = u.username;
+        li.onclick = () => {
+          selectedUser = u;
+          document.querySelectorAll(".users-list li").forEach(el => el.classList.remove("active"));
+          li.classList.add("active");
+          messagesEl.innerHTML = ""; // clear chat
+          // fetch messages with selectedUser from in-memory messages
+          socket.emit("join", userId); // reload history
+        };
+        usersListEl.appendChild(li);
+      });
+    }
+
+    // Receive chat history
+    socket.on("chat history", (msgs) => {
+      messagesEl.innerHTML = "";
+      msgs.forEach(m => {
+        if(selectedUser && ( (m.fromId == userId && m.toId == selectedUser.id) || (m.fromId == selectedUser.id && m.toId == userId) )) {
+          addMessage(m);
+        }
+      });
+    });
+
+    // Receive new message
+    socket.on("chat message", (msg) => {
+      if(selectedUser && ((msg.fromId == userId && msg.toId == selectedUser.id) || (msg.fromId == selectedUser.id && msg.toId == userId))) {
+        addMessage(msg);
+      }
+    });
+
+    function addMessage(msg) {
+      const li = document.createElement("li");
+      li.textContent = msg.text;
+      li.className = (msg.fromId == userId) ? "me" : "other";
+      messagesEl.appendChild(li);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    // Send message
+    sendBtn.onclick = () => {
+      if(!selectedUser) return alert("Select a user first");
+      if(inputEl.value) {
+        socket.emit("chat message", {
+          fromId: userId,
+          toId: selectedUser.id,
+          text: inputEl.value
+        });
+        inputEl.value = "";
+      }
+    };
+
+    inputEl.addEventListener("keyup", (e) => {
+      if(e.key === "Enter") sendBtn.click();
+    });
+
+  </script>
+</body>
+</html>

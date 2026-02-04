@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chat App Login</title>
+  <style>
+    body { font-family: Arial; display: flex; justify-content: center; margin-top: 100px; }
+    .container { width: 300px; }
+    input, button { width: 100%; padding: 10px; margin: 5px 0; }
+    #error { color: red; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Login / Register</h2>
+    <input id="username" placeholder="Enter username" />
+    <button id="loginBtn">Login</button>
+    <button id="registerBtn">Register</button>
+    <p id="error"></p>
+  </div>
+
+  <script>
+    const usernameEl = document.getElementById("username");
+    const loginBtn = document.getElementById("loginBtn");
+    const registerBtn = document.getElementById("registerBtn");
+    const errorEl = document.getElementById("error");
+
+    loginBtn.onclick = async () => {
+      const username = usernameEl.value.trim();
+      if (!username) return;
+      const res = await fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        window.location.href = `chat.html?user=${data.id}`;
+      } else {
+        errorEl.textContent = data.error;
+      }
+    };
+
+    registerBtn.onclick = async () => {
+      const username = usernameEl.value.trim();
+      if (!username) return;
+      const res = await fetch("/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        window.location.href = `chat.html?user=${data.id}`;
+      } else {
+        errorEl.textContent = data.error;
+      }
+    };
+  </script>
+</body>
+</html>
